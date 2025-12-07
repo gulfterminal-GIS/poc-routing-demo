@@ -1,0 +1,2936 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Bus Route Tracking System</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/light/main.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://js.arcgis.com/4.32/"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #1976D2;
+            --success-color: #4CAF50;
+            --warning-color: #FF9800;
+            --danger-color: #F44336;
+            --bg-dark: #263238;
+            --text-white: #FFFFFF;
+            --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #displayMap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        #routesContainer {
+            direction: rtl;
+        }
+
+        /* Custom Controls Container */
+        .custom-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--bg-dark);
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Info Panel */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            min-width: 340px;
+            max-width: 400px;
+            z-index: 100;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .info-panel h2 {
+            margin: 0 0 20px 0;
+            font-size: 20px;
+            color: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .info-panel h2 i {
+            color: var(--primary-color);
+        }
+
+        .routes-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .route-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .route-card.route-1 {
+            border-left-color: #FF6B6B;
+        }
+
+        .route-card.route-2 {
+            border-left-color: #4ECDC4;
+        }
+
+        .route-card.route-3 {
+            border-left-color: #95E1D3;
+        }
+
+        .route-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .route-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--bg-dark);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #e8f5e9;
+            color: var(--success-color);
+        }
+
+        .status-stopped {
+            background: #fff3e0;
+            color: var(--warning-color);
+        }
+
+        .status-completed {
+            background: #e3f2fd;
+            color: var(--primary-color);
+        }
+
+        .route-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 10px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .route-1 .progress-fill {
+            background: linear-gradient(90deg, #FF6B6B, #FF8E8E);
+        }
+
+        .route-2 .progress-fill {
+            background: linear-gradient(90deg, #4ECDC4, #6ED9D1);
+        }
+
+        .route-3 .progress-fill {
+            background: linear-gradient(90deg, #95E1D3, #A8E6DC);
+        }
+
+        /* Control Buttons */
+        .control-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+
+        .action-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1565C0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #F57C00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #D32F2F;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #388E3C;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        /* Custom Popup Styles */
+        .custom-popup {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: var(--shadow-lg);
+            min-width: 250px;
+        }
+
+        .popup-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .popup-icon {
+            font-size: 24px;
+        }
+
+        .popup-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--bg-dark);
+        }
+
+        .popup-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .popup-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .popup-value {
+            color: var(--bg-dark);
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Initializing Bus Tracking System...</div>
+        </div>
+    </div>
+
+    <!-- Main Map Container -->
+    <div id="displayMap"></div>
+
+    <!-- Custom Controls -->
+    <div class="custom-controls">
+        <button class="control-btn" id="fullscreenBtn" title="Fullscreen">
+            <i class="fas fa-expand"></i>
+        </button>
+        <button class="control-btn" id="zoomInBtn" title="Zoom In">
+            <i class="fas fa-plus"></i>
+        </button>
+        <button class="control-btn" id="zoomOutBtn" title="Zoom Out">
+            <i class="fas fa-minus"></i>
+        </button>
+        <button class="control-btn" id="homeBtn" title="Reset View">
+            <i class="fas fa-home"></i>
+        </button>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h2><i class="fas fa-bus"></i> Multi-Route Tracking</h2>
+        <div class="routes-container" id="routesContainer">
+            <!-- Route cards will be dynamically added here -->
+        </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <button class="action-btn btn-primary" id="startBtn">
+            <i class="fas fa-play"></i> Start All Routes
+        </button>
+        <button class="action-btn btn-warning" id="pauseBtn" style="display: none;">
+            <i class="fas fa-pause"></i> Pause All
+        </button>
+        <button class="action-btn btn-success" id="resumeBtn" style="display: none;">
+            <i class="fas fa-play"></i> Resume All
+        </button>
+        <button class="action-btn btn-danger" id="resetBtn">
+            <i class="fas fa-redo"></i> Reset All
+        </button>
+    </div>
+
+    <script>
+        // Global variables
+        let displayMap;
+        let view;
+        let homeExtent;
+        let isAnimating = false;
+        let isPaused = false;
+
+        // Routes configuration
+        const routes = [
+            {
+                id: 'route-1',
+                name: 'البحيرة - الاسكندرية',
+                color: '#FF6B6B',
+                routeID: '1001',
+                busNumber: 'س ه م 4215',
+                driverName: 'اشرف',
+                passengersNumber: '14 راكب',
+                data: {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": 1,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.15482780800005,
+                                    30.859643247000065
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 1,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 2,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.15246081500004,
+                                    30.856957058000035
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 2,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 3,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.148972141000058,
+                                    30.852533277000077
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 3,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 4,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.145087845000035,
+                                    30.847929666000027
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 4,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 5,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.142552982000041,
+                                    30.844925811000053
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 5,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 6,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.139514599000051,
+                                    30.841358012000057
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 6,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 7,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.136205524000047,
+                                    30.837515839000048
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 7,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 8,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.134481932000028,
+                                    30.835497617000044
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 8,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 9,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.133642234000035,
+                                    30.834613723000075
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 9,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 10,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.132758341000056,
+                                    30.83395080300005
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 10,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 11,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.132080689000077,
+                                    30.833597246000068
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 11,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 12,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.127322398000047,
+                                    30.831903118000071
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 12,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 13,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.125259980000067,
+                                    30.830886640000074
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 13,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 14,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.124135668000065,
+                                    30.830109404000041
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 14,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 15,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.121788048000042,
+                                    30.827959775000068
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 15,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 16,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.118720113000052,
+                                    30.825041184000042
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 16,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 17,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.102262866000046,
+                                    30.809931591000066
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 17,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 18,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.075783598000044,
+                                    30.784687107000025
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 18,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 19,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.054380667000032,
+                                    30.765342150000038
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 19,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 20,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.017666407000036,
+                                    30.730834039000058
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 20,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 21,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.970320996000055,
+                                    30.774860281000031
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 21,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 22,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.940523245000065,
+                                    30.80251430900006
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 22,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 23,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.918871641000067,
+                                    30.823094051000055
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 23,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 24,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.895290687000056,
+                                    30.861466694000057
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 24,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 25,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.880284625000058,
+                                    30.888263233000032
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 25,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 26,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.877283413000043,
+                                    30.895980637000036
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 26,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 27,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.859490511000047,
+                                    30.920633452000061
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 27,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 28,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.829924282000036,
+                                    30.966886422000073
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 28,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 29,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.827582595000024,
+                                    30.969457786000078
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 29,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 30,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.824057956000047,
+                                    30.972263111000075
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 30,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 31,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.817871854000032,
+                                    30.977729898000064
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 31,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 32,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.816505157000051,
+                                    30.979024664000065
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 32,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 33,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.815282323000076,
+                                    30.981829989000062
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 33,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 34,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.809312016000035,
+                                    30.995820648000063
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 34,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 35,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.806506691000038,
+                                    31.001898852000068
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 35,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 36,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.805499651000048,
+                                    31.003912932000048
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 36,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 37,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.80251449800005,
+                                    31.007365640000046
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 37,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 38,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.797946853000042,
+                                    31.01232890700004
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 38,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 39,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.796867882000072,
+                                    31.013479810000035
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 39,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 40,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.796256465000056,
+                                    31.014918438000052
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 40,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 41,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.792529519000027,
+                                    31.024467333000075
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 41,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 42,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.790956019000078,
+                                    31.026658993000069
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 42,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 43,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.784493431000044,
+                                    31.032728206000058
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 43,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 44,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.782733360000066,
+                                    31.037648764000039
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 44,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 45,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.782157908000045,
+                                    31.03847597500004
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 45,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 46,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.780539452000028,
+                                    31.039518981000072
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 46,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 47,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.776691121000056,
+                                    31.042216409000048
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 47,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 48,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.774137556000028,
+                                    31.046424396000077
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 48,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 49,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.766004811000073,
+                                    31.060882610000078
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 49,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 50,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.764712293000059,
+                                    31.063636234000057
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 50,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 51,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.762520633000065,
+                                    31.070267411000032
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 51,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 52,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.759542223000039,
+                                    31.073358214000052
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 52,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 53,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.743751030000055,
+                                    31.077460552000048
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 53,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 54,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.735546354000064,
+                                    31.07796632000003
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 54,
+                                "رقم_الرحلة": "1001",
+                                "اسم_السائق": "اشرف",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - الاسكندرية",
+                                "رقم_الباص": "س ه م 4215",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 1
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'route-2',
+                name: 'البحيرة - القاهرة',
+                color: '#4ECDC4',
+                routeID: '1002',
+                busNumber: 'ق م ن 3323',
+                driverName: 'عادل',
+                passengersNumber: '14 راكب',
+                data: {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": 1,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.15482780800005,
+                                    30.859643247000065
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 1,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 2,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.157398336000028,
+                                    30.863117511000041
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 2,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 3,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.157747179000069,
+                                    30.863702059000047
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 3,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 4,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.158058310000058,
+                                    30.864673163000077
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 4,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 5,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.158567432000041,
+                                    30.866379666000057
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 5,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 6,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.159010557000045,
+                                    30.86698307000006
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 6,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 7,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.162008723000042,
+                                    30.869698390000053
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 7,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 8,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.16775879000005,
+                                    30.874924627000041
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 8,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 9,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.172472103000075,
+                                    30.879260449000071
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 9,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 10,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.178276998000058,
+                                    30.884701004000078
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 10,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 11,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.17846114300005,
+                                    30.885184383000023
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 11,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 12,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.17846114300005,
+                                    30.885874924000063
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 12,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 13,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.178184926000029,
+                                    30.887071863000074
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 13,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 14,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.177333258000033,
+                                    30.890685697000038
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 14,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 15,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.177202069000032,
+                                    30.891089831000045
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 15,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 16,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.177262410000026,
+                                    30.89145187400004
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 16,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 17,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    30.177624452000032,
+                                    30.891904427000043
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 17,
+                                "رقم_الرحلة": "1002",
+                                "اسم_السائق": "عادل",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "البحيرة - القاهرة",
+                                "رقم_الباص": "ق م ن 3323",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 2
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'route-3',
+                name: 'الاسكندرية - الاسكندرية',
+                color: '#95E1D3',
+                routeID: '1003',
+                busNumber: 'ب ل س 5566',
+                driverName: 'مهدى',
+                passengersNumber: '14 راكب',
+                data: {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": 1,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.735546354000064,
+                                    31.07796632000003
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 1,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 2,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.743751030000055,
+                                    31.077460552000048
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 2,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 3,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.759542223000039,
+                                    31.073358214000052
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 3,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 4,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.762520633000065,
+                                    31.070267411000032
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 4,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 5,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.764712293000059,
+                                    31.063636234000057
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 5,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 6,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.766004811000073,
+                                    31.060882610000078
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 6,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 7,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.774137556000028,
+                                    31.046424396000077
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 7,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 8,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.776691121000056,
+                                    31.042216409000048
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 8,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 9,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.780539452000028,
+                                    31.039518981000072
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 9,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 10,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.782157908000045,
+                                    31.03847597500004
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 10,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 11,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.782014046000029,
+                                    31.041065506000052
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 11,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 12,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.782050011000024,
+                                    31.042719928000054
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 12,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 13,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.782805291000045,
+                                    31.044230488000039
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 13,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 14,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.784531645000072,
+                                    31.04588491100003
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 14,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 15,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.792192340000042,
+                                    31.04937358400008
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 15,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 16,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.799637241000028,
+                                    31.053114017000041
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 16,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 17,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.804417803000035,
+                                    31.056438687000025
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 17,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 18,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.810241370000028,
+                                    31.061571713000035
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 18,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 19,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.813164140000026,
+                                    31.063534378000043
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 19,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "id": 20,
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    29.837925685000073,
+                                    31.075827344000061
+                                ]
+                            },
+                            "properties": {
+                                "OBJECTID": 20,
+                                "رقم_الرحلة": "1003",
+                                "اسم_السائق": "مهدى",
+                                "عدد_الركاب": "14 راكب",
+                                "المسار": "الاسكندرية - الاسكندرية",
+                                "رقم_الباص": "أ ن ه 1111",
+                                "وقت_البداية": "07/012/2025",
+                                "ORIG_FID": 3
+                            }
+                        }
+                    ]
+                }
+            }
+        ];
+
+        // Bus state management
+        let busStates = {};
+
+        // Utility function to load ArcGIS modules
+        function loadModule(moduleName) {
+            return new Promise((resolve, reject) => {
+                require([moduleName], (module) => {
+                    if (module) {
+                        resolve(module);
+                    } else {
+                        reject(new Error(`Module not found: ${moduleName}`));
+                    }
+                }, (error) => {
+                    reject(error);
+                });
+            });
+        }
+
+        // Initialize the map
+        async function initializeMap() {
+            try {
+                const [esriConfig, Map, MapView, GraphicsLayer] = await Promise.all([
+                    loadModule("esri/config"),
+                    loadModule("esri/Map"),
+                    loadModule("esri/views/MapView"),
+                    loadModule("esri/layers/GraphicsLayer")
+                ]);
+
+                esriConfig.apiKey = "AAPK67a9b2041fcc449d90ab91d6bae4a156HTaBtzlYSKLe8L-zBuIgrSGvxOopzVQEtdwVrlp6RKN9Rrq_y2qkTax7Do1cHqm9";
+
+                // Create map
+                displayMap = new Map({
+                    basemap: "streets-navigation-vector"
+                });
+
+                // Create view centered to show all routes
+                view = new MapView({
+                    container: "displayMap",
+                    map: displayMap,
+                    center: [30.151, 30.855],
+                    zoom: 13
+                });
+
+                // Initialize each route with its own layers
+                for (const route of routes) {
+                    busStates[route.id] = {
+                        pointsLayer: new GraphicsLayer({ title: `${route.name} - Points` }),
+                        routeLayer: new GraphicsLayer({ title: `${route.name} - Path` }),
+                        busLayer: new GraphicsLayer({ title: `${route.name} - Bus` }),
+                        currentIndex: 0,
+                        visitedPoints: [],
+                        interval: null,
+                        completed: false
+                    };
+
+                    displayMap.addMany([
+                        busStates[route.id].pointsLayer,
+                        busStates[route.id].routeLayer,
+                        busStates[route.id].busLayer
+                    ]);
+                }
+
+                await view.when();
+                view.ui.remove(["zoom", "attribution"]);
+
+                // Store home extent
+                homeExtent = view.extent.clone();
+
+                // Initialize UI
+                initializeRouteCards();
+                initializeEventHandlers();
+                setupPopupHandler();
+
+                // Hide loading screen
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').classList.add('fade-out');
+                }, 1500);
+
+                console.log("Map initialized successfully");
+                return [view, displayMap];
+            } catch (error) {
+                console.error("Error initializing map:", error);
+                throw error;
+            }
+        }
+
+        // Initialize route cards in info panel
+        function initializeRouteCards() {
+            const container = document.getElementById('routesContainer');
+            container.innerHTML = '';
+
+            routes.forEach((route, index) => {
+                const card = document.createElement('div');
+                card.className = `route-card route-${index + 1}`;
+                card.innerHTML = `
+          <div class="route-header">
+            <div class="route-name">${route.name}</div>
+            <span class="status-badge status-active" id="status-${route.id}">Ready</span>
+          </div>
+          <div class="route-info">
+            <span>الرحلة: ${route.routeID}</span>
+            <span id="points-${route.id}">0 / ${route.data.features.length}</span>
+          </div>
+          
+          <div class="route-info">
+            <span>السائق: ${route.driverName}</span>
+            <span id="points-${route.id}">0 / ${route.data.features.length}</span>
+          </div>
+
+        <div class="route-info">
+            <span>الباص: ${route.busNumber}</span>
+            <span id="points-${route.id}">0 / ${route.data.features.length}</span>
+          </div>
+
+                  <div class="route-info">
+            <span>عدد الركاب: ${route.passengersNumber}</span>
+            <span id="points-${route.id}">0 / ${route.data.features.length}</span>
+          </div>
+
+          <div class="progress-container">
+            <div class="progress-label">
+              <span>Progress</span>
+              <span id="progress-text-${route.id}">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-${route.id}"></div>
+            </div>
+          </div>
+        `;
+                container.appendChild(card);
+            });
+        }
+
+        // Setup popup handler for bus clicks
+        async function setupPopupHandler() {
+            view.on("click", async (event) => {
+                const response = await view.hitTest(event);
+
+                if (response.results.length > 0) {
+                    const graphic = response.results[0].graphic;
+
+                    // Check if clicked on a bus or point
+                    if (graphic && graphic.attributes) {
+                        const attrs = graphic.attributes;
+
+                        // Create custom popup content
+                        const popupContent = `
+              <div class="custom-popup">
+                <div class="popup-header">
+                  <div class="popup-icon">🚌</div>
+                  <div class="popup-title">${attrs.routeName || attrs.location_name || 'Bus Stop'}</div>
+                </div>
+                <div class="popup-content">
+                  ${attrs.busNumber ? `
+                    <div class="popup-row">
+                      <span class="popup-label">Bus Number:</span>
+                      <span class="popup-value">${attrs.busNumber}</span>
+                    </div>
+                  ` : ''}
+                  ${attrs.location_name ? `
+                    <div class="popup-row">
+                      <span class="popup-label">Location:</span>
+                      <span class="popup-value">${attrs.location_name}</span>
+                    </div>
+                  ` : ''}
+                  ${attrs.date_time ? `
+                    <div class="popup-row">
+                      <span class="popup-label">Time:</span>
+                      <span class="popup-value">${attrs.date_time}</span>
+                    </div>
+                  ` : ''}
+                  ${attrs.pointNumber ? `
+                    <div class="popup-row">
+                      <span class="popup-label">Stop Number:</span>
+                      <span class="popup-value">${attrs.pointNumber}</span>
+                    </div>
+                  ` : ''}
+                  ${attrs.status ? `
+                    <div class="popup-row">
+                      <span class="popup-label">Status:</span>
+                      <span class="popup-value">${attrs.status}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+
+                        view.popup.open({
+                            title: "",
+                            content: popupContent,
+                            location: event.mapPoint
+                        });
+                    }
+                }
+            });
+        }
+
+        // Draw a point on the map
+        async function drawPoint(routeId, coordinates, isVisited, properties) {
+            const [Graphic, Point] = await Promise.all([
+                loadModule("esri/Graphic"),
+                loadModule("esri/geometry/Point")
+            ]);
+
+            const route = routes.find(r => r.id === routeId);
+            const point = new Point({
+                longitude: coordinates[0],
+                latitude: coordinates[1]
+            });
+
+            const symbol = {
+                type: "simple-marker",
+                color: isVisited ? [route.color.replace('#', '0x'), 0.8] : [158, 158, 158, 0.6],
+                size: isVisited ? 10 : 8,
+                outline: {
+                    color: [255, 255, 255, 1],
+                    width: 2
+                }
+            };
+
+            const graphic = new Graphic({
+                geometry: point,
+                symbol: symbol,
+                attributes: {
+                    ...properties,
+                    routeName: route.name,
+                    busNumber: route.busNumber,
+                    pointNumber: properties.OBJECTID
+                }
+            });
+
+            busStates[routeId].pointsLayer.add(graphic);
+            return graphic;
+        }
+
+        // Draw the route line
+        async function drawRouteLine(routeId, points) {
+            const [Graphic, Polyline] = await Promise.all([
+                loadModule("esri/Graphic"),
+                loadModule("esri/geometry/Polyline")
+            ]);
+
+            const route = routes.find(r => r.id === routeId);
+            const polyline = new Polyline({
+                paths: [points.map(p => [p[0], p[1]])]
+            });
+
+            const symbol = {
+                type: "simple-line",
+                color: route.color,
+                width: 4,
+                style: "solid",
+                cap: "round",
+                join: "round"
+            };
+
+            const graphic = new Graphic({
+                geometry: polyline,
+                symbol: symbol
+            });
+
+            busStates[routeId].routeLayer.removeAll();
+            busStates[routeId].routeLayer.add(graphic);
+        }
+
+        // Create/update bus marker
+        async function updateBusPosition(routeId, coordinates, properties) {
+            const [Graphic, Point] = await Promise.all([
+                loadModule("esri/Graphic"),
+                loadModule("esri/geometry/Point")
+            ]);
+
+            const route = routes.find(r => r.id === routeId);
+            const point = new Point({
+                longitude: coordinates[0],
+                latitude: coordinates[1]
+            });
+
+            // Remove old bus graphic
+            busStates[routeId].busLayer.removeAll();
+
+            // Create bus symbol with route color
+            const symbol = {
+                type: "picture-marker",
+                url: "data:image/svg+xml;base64," + btoa(`
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+            <defs>
+              <filter id="shadow">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+              </filter>
+            </defs>
+            <g filter="url(#shadow)">
+              <rect x="12" y="16" width="40" height="32" rx="4" fill="${route.color}"/>
+              <rect x="16" y="20" width="14" height="10" rx="2" fill="#B3E5FC"/>
+              <rect x="34" y="20" width="14" height="10" rx="2" fill="#B3E5FC"/>
+              <circle cx="20" cy="44" r="4" fill="#424242"/>
+              <circle cx="44" cy="44" r="4" fill="#424242"/>
+              <rect x="28" y="12" width="8" height="6" rx="1" fill="#FFC107"/>
+            </g>
+          </svg>
+        `),
+                width: 40,
+                height: 40
+            };
+
+            const graphic = new Graphic({
+                geometry: point,
+                symbol: symbol,
+                attributes: {
+                    ...properties,
+                    routeName: route.name,
+                    busNumber: route.busNumber,
+                    status: 'Moving'
+                }
+            });
+
+            busStates[routeId].busLayer.add(graphic);
+        }
+
+        // Animate a single route
+        async function animateRoute(routeId) {
+            const route = routes.find(r => r.id === routeId);
+            const state = busStates[routeId];
+
+            if (state.currentIndex >= route.data.features.length) {
+                state.completed = true;
+                document.getElementById(`status-${routeId}`).textContent = 'Completed';
+                document.getElementById(`status-${routeId}`).className = 'status-badge status-completed';
+                return;
+            }
+
+            const feature = route.data.features[state.currentIndex];
+            const coords = feature.geometry.coordinates;
+
+            // Add to visited points
+            state.visitedPoints.push(coords);
+
+            // Update bus position
+            await updateBusPosition(routeId, coords, feature.properties);
+
+            // Redraw all points
+            state.pointsLayer.removeAll();
+            for (let i = 0; i < route.data.features.length; i++) {
+                const f = route.data.features[i];
+                await drawPoint(routeId, f.geometry.coordinates, i <= state.currentIndex, f.properties);
+            }
+
+            // Draw route line
+            if (state.visitedPoints.length > 1) {
+                await drawRouteLine(routeId, state.visitedPoints);
+            }
+
+            // Update UI
+            const progress = ((state.currentIndex + 1) / route.data.features.length * 100).toFixed(0);
+            document.getElementById(`points-${routeId}`).textContent = `${state.currentIndex + 1} / ${route.data.features.length}`;
+            document.getElementById(`progress-text-${routeId}`).textContent = `${progress}%`;
+            document.getElementById(`progress-${routeId}`).style.width = `${progress}%`;
+
+            state.currentIndex++;
+
+            // Schedule next point if still animating and not paused
+            if (isAnimating && !isPaused && state.currentIndex < route.data.features.length) {
+                state.interval = setTimeout(() => animateRoute(routeId), 2000);
+            }
+        }
+
+        // Start all routes
+        async function startAllRoutes() {
+            if (isAnimating) return;
+
+            isAnimating = true;
+            isPaused = false;
+
+            // Update UI
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'flex';
+
+            // Initialize all routes
+            for (const route of routes) {
+                const state = busStates[route.id];
+                state.currentIndex = 0;
+                state.visitedPoints = [];
+                state.completed = false;
+
+                // Clear layers
+                state.pointsLayer.removeAll();
+                state.routeLayer.removeAll();
+                state.busLayer.removeAll();
+
+                // Update status
+                document.getElementById(`status-${route.id}`).textContent = 'Moving';
+                document.getElementById(`status-${route.id}`).className = 'status-badge status-active';
+
+                // Draw initial points
+                for (const feature of route.data.features) {
+                    await drawPoint(route.id, feature.geometry.coordinates, false, feature.properties);
+                }
+
+                // Start animation for this route
+                animateRoute(route.id);
+            }
+        }
+
+        // Pause all routes
+        function pauseAllRoutes() {
+            isPaused = true;
+
+            // Clear all intervals
+            for (const routeId in busStates) {
+                clearTimeout(busStates[routeId].interval);
+                if (!busStates[routeId].completed) {
+                    document.getElementById(`status-${routeId}`).textContent = 'Paused';
+                    document.getElementById(`status-${routeId}`).className = 'status-badge status-stopped';
+                }
+            }
+
+            // Update UI
+            document.getElementById('pauseBtn').style.display = 'none';
+            document.getElementById('resumeBtn').style.display = 'flex';
+        }
+
+        // Resume all routes
+        function resumeAllRoutes() {
+            isPaused = false;
+
+            // Resume all non-completed routes
+            for (const route of routes) {
+                const state = busStates[route.id];
+                if (!state.completed) {
+                    document.getElementById(`status-${route.id}`).textContent = 'Moving';
+                    document.getElementById(`status-${route.id}`).className = 'status-badge status-active';
+                    animateRoute(route.id);
+                }
+            }
+
+            // Update UI
+            document.getElementById('resumeBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'flex';
+        }
+
+        // Reset all routes
+        function resetAllRoutes() {
+            isAnimating = false;
+            isPaused = false;
+
+            // Clear all intervals and reset state
+            for (const routeId in busStates) {
+                const state = busStates[routeId];
+                clearTimeout(state.interval);
+                state.currentIndex = 0;
+                state.visitedPoints = [];
+                state.completed = false;
+
+                // Clear layers
+                state.pointsLayer.removeAll();
+                state.routeLayer.removeAll();
+                state.busLayer.removeAll();
+
+                // Reset UI
+                document.getElementById(`status-${routeId}`).textContent = 'Ready';
+                document.getElementById(`status-${routeId}`).className = 'status-badge status-active';
+                document.getElementById(`points-${routeId}`).textContent = `0 / ${routes.find(r => r.id === routeId).data.features.length}`;
+                document.getElementById(`progress-text-${routeId}`).textContent = '0%';
+                document.getElementById(`progress-${routeId}`).style.width = '0%';
+            }
+
+            // Update control buttons
+            document.getElementById('startBtn').style.display = 'flex';
+            document.getElementById('pauseBtn').style.display = 'none';
+            document.getElementById('resumeBtn').style.display = 'none';
+
+            // Close popup
+            view.popup.close();
+        }
+
+        // Initialize event handlers
+        function initializeEventHandlers() {
+            // Start button
+            document.getElementById('startBtn').addEventListener('click', startAllRoutes);
+
+            // Pause button
+            document.getElementById('pauseBtn').addEventListener('click', pauseAllRoutes);
+
+            // Resume button
+            document.getElementById('resumeBtn').addEventListener('click', resumeAllRoutes);
+
+            // Reset button
+            document.getElementById('resetBtn').addEventListener('click', resetAllRoutes);
+
+            // Fullscreen
+            document.getElementById('fullscreenBtn').addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+
+            // Zoom controls
+            document.getElementById('zoomInBtn').addEventListener('click', () => {
+                view.zoom += 1;
+            });
+
+            document.getElementById('zoomOutBtn').addEventListener('click', () => {
+                view.zoom -= 1;
+            });
+
+            // Home button
+            document.getElementById('homeBtn').addEventListener('click', () => {
+                if (homeExtent) {
+                    view.goTo(homeExtent);
+                }
+            });
+        }
+
+        // Initialize application
+        initializeMap()
+            .then(() => {
+                console.log("Application initialized successfully");
+            })
+            .catch((error) => {
+                console.error("Failed to initialize application:", error);
+            });
+    </script>
+</body>
+
+</html>
